@@ -1,0 +1,57 @@
+{
+  "name": "everytheme",
+  "displayName": "Everytheme",
+  "description": "AI-powered VS Code theme that changes on the fly via natural language",
+  "version": "0.0.1",
+  "publisher": "everytheme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "themes": [
+      {
+        "label": "Everytheme",
+        "uiTheme": "vs-dark",
+        "path": "./themes/everytheme-color-theme.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "everytheme.chat",
+        "title": "Everytheme: Change Theme with AI"
+      },
+      {
+        "command": "everytheme.reset",
+        "title": "Everytheme: Reset to Default"
+      }
+    ],
+    "configuration": {
+      "title": "Everytheme",
+      "properties": {
+        "everytheme.anthropicApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API key for AI-powered theme changes"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  }
+}
