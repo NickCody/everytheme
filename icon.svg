@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- Background gradient: dark morphing diagonal -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0D0D1A"/>
+      <stop offset="50%" stop-color="#1A0A2E"/>
+      <stop offset="100%" stop-color="#0A1628"/>
+    </linearGradient>
+
+    <!-- Left color scheme: warm (sunset/fire) -->
+    <linearGradient id="warm" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B35"/>
+      <stop offset="30%" stop-color="#F7C948"/>
+      <stop offset="60%" stop-color="#E8365D"/>
+      <stop offset="100%" stop-color="#D946EF"/>
+    </linearGradient>
+
+    <!-- Right color scheme: cool (ocean/cyber) -->
+    <linearGradient id="cool" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06D6A0"/>
+      <stop offset="30%" stop-color="#118AB2"/>
+      <stop offset="60%" stop-color="#7E9CD8"/>
+      <stop offset="100%" stop-color="#957FB8"/>
+    </linearGradient>
+
+    <!-- Morph zone: the blend in the middle -->
+    <linearGradient id="morph" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F7C948"/>
+      <stop offset="25%" stop-color="#E8365D"/>
+      <stop offset="50%" stop-color="#D946EF"/>
+      <stop offset="75%" stop-color="#06D6A0"/>
+      <stop offset="100%" stop-color="#118AB2"/>
+    </linearGradient>
+
+    <!-- Glow for the morph seam -->
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D946EF" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#D946EF" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#D946EF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Mask for the left/warm side of the letters -->
+    <clipPath id="leftHalf">
+      <rect x="0" y="0" width="128" height="256"/>
+    </clipPath>
+    <clipPath id="rightHalf">
+      <rect x="128" y="0" width="128" height="256"/>
+    </clipPath>
+
+    <!-- Scatter pixel mask for the morph zone -->
+    <clipPath id="morphLeft">
+      <rect x="100" y="0" width="56" height="256"/>
+    </clipPath>
+    <clipPath id="morphRight">
+      <rect x="100" y="0" width="56" height="256"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern to evoke code editor -->
+  <g opacity="0.06">
+    <line x1="0" y1="64" x2="256" y2="64" stroke="#fff" stroke-width="0.5"/>
+    <line x1="0" y1="128" x2="256" y2="128" stroke="#fff" stroke-width="0.5"/>
+    <line x1="0" y1="192" x2="256" y2="192" stroke="#fff" stroke-width="0.5"/>
+    <line x1="64" y1="0" x2="64" y2="256" stroke="#fff" stroke-width="0.5"/>
+    <line x1="128" y1="0" x2="128" y2="256" stroke="#fff" stroke-width="0.5"/>
+    <line x1="192" y1="0" x2="192" y2="256" stroke="#fff" stroke-width="0.5"/>
+  </g>
+
+  <!-- Center glow at the morph seam -->
+  <ellipse cx="128" cy="128" rx="90" ry="120" fill="url(#glow)"/>
+
+  <!-- "ET" letters — warm (left half) -->
+  <g clip-path="url(#leftHalf)">
+    <!-- E -->
+    <rect x="28" y="72" width="16" height="112" rx="3" fill="url(#warm)"/>
+    <rect x="28" y="72" width="60" height="16" rx="3" fill="url(#warm)"/>
+    <rect x="28" y="122" width="48" height="14" rx="3" fill="url(#warm)"/>
+    <rect x="28" y="168" width="60" height="16" rx="3" fill="url(#warm)"/>
+    <!-- T -->
+    <rect x="104" y="72" width="72" height="16" rx="3" fill="url(#warm)"/>
+    <rect x="132" y="72" width="16" height="112" rx="3" fill="url(#warm)"/>
+  </g>
+
+  <!-- "ET" letters — cool (right half) -->
+  <g clip-path="url(#rightHalf)">
+    <!-- E -->
+    <rect x="28" y="72" width="16" height="112" rx="3" fill="url(#cool)"/>
+    <rect x="28" y="72" width="60" height="16" rx="3" fill="url(#cool)"/>
+    <rect x="28" y="122" width="48" height="14" rx="3" fill="url(#cool)"/>
+    <rect x="28" y="168" width="60" height="16" rx="3" fill="url(#cool)"/>
+    <!-- T -->
+    <rect x="104" y="72" width="72" height="16" rx="3" fill="url(#cool)"/>
+    <rect x="132" y="72" width="16" height="112" rx="3" fill="url(#cool)"/>
+  </g>
+
+  <!-- Morph particles: scattered pixels along the seam -->
+  <g opacity="0.9">
+    <!-- Warm fragments dissolving right -->
+    <rect x="130" y="78" width="4" height="4" rx="1" fill="#F7C948" opacity="0.8"/>
+    <rect x="138" y="95" width="3" height="3" rx="1" fill="#FF6B35" opacity="0.6"/>
+    <rect x="132" y="110" width="5" height="3" rx="1" fill="#E8365D" opacity="0.7"/>
+    <rect x="142" y="130" width="3" height="5" rx="1" fill="#D946EF" opacity="0.5"/>
+    <rect x="135" y="148" width="4" height="4" rx="1" fill="#F7C948" opacity="0.6"/>
+    <rect x="140" y="165" width="3" height="3" rx="1" fill="#FF6B35" opacity="0.7"/>
+    <rect x="133" y="175" width="4" height="3" rx="1" fill="#E8365D" opacity="0.5"/>
+
+    <!-- Cool fragments dissolving left -->
+    <rect x="118" y="82" width="4" height="3" rx="1" fill="#06D6A0" opacity="0.6"/>
+    <rect x="122" y="100" width="3" height="4" rx="1" fill="#118AB2" opacity="0.7"/>
+    <rect x="116" y="118" width="5" height="3" rx="1" fill="#7E9CD8" opacity="0.5"/>
+    <rect x="124" y="138" width="3" height="4" rx="1" fill="#957FB8" opacity="0.6"/>
+    <rect x="119" y="155" width="4" height="3" rx="1" fill="#06D6A0" opacity="0.7"/>
+    <rect x="125" y="170" width="3" height="4" rx="1" fill="#118AB2" opacity="0.5"/>
+    <rect x="117" y="180" width="4" height="3" rx="1" fill="#7E9CD8" opacity="0.6"/>
+
+    <!-- Brighter morph sparks at the center seam -->
+    <rect x="127" y="86" width="2" height="2" rx="1" fill="#fff" opacity="0.9"/>
+    <rect x="129" y="106" width="2" height="2" rx="1" fill="#fff" opacity="0.7"/>
+    <rect x="126" y="126" width="3" height="3" rx="1" fill="#fff" opacity="0.9"/>
+    <rect x="130" y="146" width="2" height="2" rx="1" fill="#fff" opacity="0.8"/>
+    <rect x="127" y="162" width="2" height="2" rx="1" fill="#fff" opacity="0.7"/>
+    <rect x="129" y="178" width="2" height="2" rx="1" fill="#fff" opacity="0.6"/>
+  </g>
+
+  <!-- Subtle morph line down the center -->
+  <line x1="128" y1="68" x2="128" y2="188" stroke="url(#morph)" stroke-width="1.5" opacity="0.4" stroke-dasharray="3,5"/>
+</svg>

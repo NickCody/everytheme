@@ -1,75 +1,150 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import Anthropic from "@anthropic-ai/sdk";
 import { ThemeEngine } from "./theme-engine";
 import { THEME_TOOLS, handleToolCall } from "./llm-tools";
+import { detectAllOptions, detectDefaultProvider, type LLMProvider } from "./llm-provider";
+import { initLog, log, logError } from "./log";
 
 let themeEngine: ThemeEngine;
+let activeProvider: LLMProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-  themeEngine = new ThemeEngine(context);
+  const outputChannel = initLog();
+  context.subscriptions.push(outputChannel);
+  log("Everytheme activating...");
 
-  // Save a copy of the default theme for reset functionality
+  themeEngine = new ThemeEngine(context);
   saveDefaultThemeIfNeeded(context);
 
-  const chatCmd = vscode.commands.registerCommand("everytheme.chat", () =>
-    openThemeChat(context)
+  activeProvider = detectDefaultProvider();
+  if (activeProvider) {
+    log(`Auto-selected provider: ${activeProvider.id} / ${activeProvider.model}`);
+  } else {
+    log("No provider detected — no API keys found in env");
+  }
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("everytheme.chat", () => openThemeChat()),
+    vscode.commands.registerCommand("everytheme.selectTheme", () => selectTheme()),
+    vscode.commands.registerCommand("everytheme.selectProvider", () => selectProvider()),
+    vscode.commands.registerCommand("everytheme.reset", async () => {
+      await themeEngine.resetTheme();
+      vscode.window.showInformationMessage("Everytheme: Reset to defaults.");
+    })
   );
-
-  const resetCmd = vscode.commands.registerCommand("everytheme.reset", async () => {
-    await themeEngine.resetTheme();
-    vscode.window.showInformationMessage("Everytheme: Reset to Kanagawa defaults.");
-  });
-
-  context.subscriptions.push(chatCmd, resetCmd);
 }
 
 function saveDefaultThemeIfNeeded(context: vscode.ExtensionContext) {
   const defaultPath = path.join(context.extensionPath, "themes", "kanagawa-default.json");
   if (!fs.existsSync(defaultPath)) {
-    const currentPath = path.join(
-      context.extensionPath,
-      "themes",
-      "everytheme-color-theme.json"
-    );
+    const currentPath = path.join(context.extensionPath, "themes", "everytheme-color-theme.json");
     fs.copyFileSync(currentPath, defaultPath);
   }
 }
 
-async function getApiKey(): Promise<string | undefined> {
-  const config = vscode.workspace.getConfiguration("everytheme");
-  let key = config.get<string>("anthropicApiKey");
+// --- Provider selection ---
 
-  if (!key) {
-    key = process.env.ANTHROPIC_API_KEY;
-  }
-
-  if (!key) {
-    key = await vscode.window.showInputBox({
-      prompt: "Enter your Anthropic API key",
-      password: true,
-      placeHolder: "sk-ant-...",
-    });
-
-    if (key) {
-      await config.update("anthropicApiKey", key, vscode.ConfigurationTarget.Global);
-    }
-  }
-
-  return key;
-}
-
-async function openThemeChat(context: vscode.ExtensionContext) {
-  const apiKey = await getApiKey();
-  if (!apiKey) {
-    vscode.window.showErrorMessage("Everytheme: No API key provided.");
+async function selectProvider() {
+  const options = detectAllOptions();
+  if (options.length === 0) {
+    vscode.window.showErrorMessage(
+      "Everytheme: No API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY."
+    );
     return;
   }
 
+  const items = options.map((o) => {
+    const isActive =
+      activeProvider?.id === o.provider.id &&
+      activeProvider?.model === o.provider.model;
+    return {
+      label: `${o.providerName}: ${o.modelEntry.label}`,
+      description: o.provider.model,
+      detail: isActive
+        ? `$(check) Active — ${o.modelEntry.description}`
+        : o.modelEntry.description,
+      option: o,
+    };
+  });
+
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: "Select AI provider and model",
+    matchOnDescription: true,
+  });
+
+  if (pick) {
+    activeProvider = pick.option.provider;
+    const config = vscode.workspace.getConfiguration("everytheme");
+    await config.update("provider", pick.option.provider.id, vscode.ConfigurationTarget.Global);
+    await config.update("model", pick.option.provider.model, vscode.ConfigurationTarget.Global);
+    log(`Provider changed: ${pick.option.providerName} / ${pick.option.provider.model}`);
+    vscode.window.showInformationMessage(
+      `Everytheme: Using ${pick.option.providerName} ${pick.option.modelEntry.label}`
+    );
+  }
+}
+
+// --- Theme chat ---
+
+const SYSTEM_PROMPT = `You are an expert VS Code theme designer. Your job is to create beautiful, complete, professional-quality color themes.
+
+CORE PRINCIPLES:
+- When creating or changing a theme, be COMPREHENSIVE. Set EVERY color category — editor, sidebar, activity bar, status bar, title bar, tabs, terminal, buttons, inputs, dropdowns, lists, badges, scrollbars, minimap, panels, notifications, git decorations, diff editor, debug, peek views, breadcrumbs, and all syntax token colors.
+- A theme is not done until every visible surface has been considered.
+- Colors must work together as a cohesive palette. Pick a base palette of 8-12 colors and derive all specific colors from that palette — backgrounds, foregrounds, accents, borders, highlights, and syntax colors should all feel related.
+- Ensure readability: maintain strong contrast between text and backgrounds. WCAG AA minimum (4.5:1 for body text, 3:1 for large text/UI).
+- Borders and separators should be subtle but present — they define structure.
+- Selection, highlight, and hover states should be clearly visible but not jarring.
+- Terminal ANSI colors (all 16) must be set to match the theme mood.
+- Syntax highlighting should cover ALL major categories: comments, strings, numbers, keywords, functions, types/classes, variables, properties, constants, operators, punctuation, tags, attributes, regex, escape chars, markup, and invalid tokens. Provide the full TextMate scope for each.
+
+CRITICAL — NEVER POLLUTE EXISTING PRESETS:
+- Color changes are LIVE ONLY — they do NOT auto-save to any preset.
+- The only way to persist a theme is to explicitly call save_preset.
+- When creating a NEW theme: first call reset_theme to start from a clean slate, then apply your colors, then call save_preset to save it. This ensures you don't contaminate an existing preset.
+- When TWEAKING the current theme (e.g. "make the background darker"): just apply the changes, then call save_preset with the same name to update it.
+- When the user asks you to create a theme, ALWAYS give it a name and save it as a preset. Infer a good name from the request (e.g. "Cyberpunk Neon", "Ocean Depths", "Forest Dawn").
+
+SPEED — MINIMIZE ROUND TRIPS:
+- The current theme state is included in the user's message. Do NOT call get_current_theme — you already have it.
+- For a NEW theme, call reset_theme + set_editor_colors + set_token_colors + save_preset ALL IN THE SAME TURN as parallel tool calls.
+- For a TWEAK, call set_editor_colors and/or set_token_colors + save_preset in one turn.
+- Aim for a single turn of tool calls. Only make additional turns if you need to fix something.
+
+WORKFLOW FOR NEW THEME:
+1. Read the current theme state from the user's message.
+2. Design your palette — decide on backgrounds, foregrounds, and accent colors.
+3. In ONE tool-call turn, call ALL of these together:
+   - reset_theme (clears the slate so existing presets are untouched)
+   - set_editor_colors with a LARGE object covering all UI surfaces (80+ color keys minimum)
+   - set_token_colors with rules for ALL syntax categories (20+ rules minimum, each with proper TextMate scopes as an array of strings)
+   - save_preset with a descriptive name and description
+
+PRESET MANAGEMENT:
+- save_preset: Save current live colors as a named preset. Always call this after creating or modifying a theme.
+- load_preset: Load a saved preset as active (replaces live colors).
+- list_presets / get_preset: Browse and inspect saved presets.
+- clone_preset / rename_preset / delete_preset: Manage presets.
+- When the user references a saved theme by name, use load_preset.
+
+Be bold and creative with color choices. The user wants a TRANSFORMATION, not a tweak. Deliver a fully realized theme that feels intentional and polished.`;
+
+async function openThemeChat() {
+  if (!activeProvider) {
+    activeProvider = detectDefaultProvider();
+    if (!activeProvider) {
+      vscode.window.showErrorMessage(
+        "Everytheme: No API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY."
+      );
+      return;
+    }
+  }
+
   const userPrompt = await vscode.window.showInputBox({
-    prompt: "Describe how you want to change the theme",
-    placeHolder: 'e.g. "Make the background a deep navy blue" or "Use warm orange tones for strings"',
+    prompt: `Describe your theme (using ${activeProvider.label} ${activeProvider.model})`,
+    placeHolder:
+      'e.g. "Create a warm sunset theme" or "Make it cyberpunk neon"',
   });
 
   if (!userPrompt) {
@@ -83,78 +158,109 @@ async function openThemeChat(context: vscode.ExtensionContext) {
       cancellable: false,
     },
     async (progress) => {
-      progress.report({ message: "Thinking..." });
+      progress.report({ message: `${activeProvider!.label}: Thinking...` });
 
       try {
-        const client = new Anthropic({ apiKey });
+        // Pre-inject current state so the LLM doesn't need to call get_current_theme
+        const currentState = themeEngine.getColorSummary();
+        const presets = themeEngine.listPresets();
+        const contextBlock = [
+          `<current_theme_state>`,
+          `Active preset: ${currentState.activePreset ?? "(none — base Kanagawa Wave)"}`,
+          `Editor colors (${Object.keys(currentState.editorColors).length} overrides): ${JSON.stringify(currentState.editorColors)}`,
+          `Token colors (${currentState.tokenColors.length} rules): ${JSON.stringify(currentState.tokenColors)}`,
+          `</current_theme_state>`,
+          presets.length > 0
+            ? `<saved_presets>${JSON.stringify(presets)}</saved_presets>`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
 
-        const systemPrompt =
-          "You are a VS Code theme designer. The user will describe how they want their editor theme to look. " +
-          "Use the provided tools to modify the theme colors. Always call get_current_theme first to see " +
-          "what's currently set, then make targeted changes based on the user's request. " +
-          "Make cohesive changes - if the user asks for a mood or style, adjust multiple related colors " +
-          "to create a harmonious result. Prefer subtle, tasteful adjustments. " +
-          "When changing backgrounds, ensure text remains readable with good contrast.";
+        const enrichedPrompt = `${userPrompt}\n\n${contextBlock}`;
 
-        let messages: Anthropic.MessageParam[] = [
-          { role: "user", content: userPrompt },
-        ];
+        log(`Chat request: provider=${activeProvider!.id} model=${activeProvider!.model}`);
+        log(`User prompt: ${userPrompt}`);
+        log(`Context: activePreset=${currentState.activePreset ?? "none"}, ${Object.keys(currentState.editorColors).length} editor colors, ${currentState.tokenColors.length} token rules, ${presets.length} saved presets`);
 
-        // Agentic loop: keep going while the model wants to use tools
-        let response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4096,
-          system: systemPrompt,
+        const startTime = Date.now();
+        const result = await activeProvider!.run({
+          systemPrompt: SYSTEM_PROMPT,
+          userPrompt: enrichedPrompt,
           tools: THEME_TOOLS,
-          messages,
-        });
-
-        while (response.stop_reason === "tool_use") {
-          const assistantContent = response.content;
-          messages.push({ role: "assistant", content: assistantContent });
-
-          const toolResults: Anthropic.ToolResultBlockParam[] = [];
-
-          for (const block of assistantContent) {
-            if (block.type === "tool_use") {
-              progress.report({ message: `Applying: ${block.name}...` });
-              const result = await handleToolCall(
-                themeEngine,
-                block.name,
-                block.input as Record<string, unknown>
-              );
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: block.id,
-                content: result,
-              });
+          handleTool: async (name, input) => {
+            const inputJson = JSON.stringify(input);
+            if (name === "set_editor_colors") {
+              log(`Tool call: ${name} — ${Object.keys((input as any).colors ?? {}).length} colors, raw keys: ${JSON.stringify(Object.keys(input)).slice(0, 500)}`);
+              if (!input.colors) {
+                log(`Tool call: ${name} — full raw input: ${inputJson.slice(0, 2000)}`);
+              }
+            } else if (name === "set_token_colors") {
+              log(`Tool call: ${name} — ${((input as any).updates ?? []).length} rules`);
+            } else {
+              log(`Tool call: ${name}(${inputJson.slice(0, 300)})`);
             }
-          }
+            const toolResult = await handleToolCall(themeEngine, name, input);
+            log(`Tool result: ${toolResult.slice(0, 300)}`);
+            return toolResult;
+          },
+          onProgress: (msg) => progress.report({ message: msg }),
+        });
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-          messages.push({ role: "user", content: toolResults });
-
-          response = await client.messages.create({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 4096,
-            system: systemPrompt,
-            tools: THEME_TOOLS,
-            messages,
-          });
-        }
-
-        // Extract the final text response
-        const textBlock = response.content.find((b) => b.type === "text");
-        if (textBlock && textBlock.type === "text") {
+        log(`Chat complete in ${elapsed}s`);
+        if (result) {
+          log(`LLM response: ${result.slice(0, 500)}`);
           vscode.window.showInformationMessage(
-            `Everytheme: ${textBlock.text.slice(0, 200)}`
+            `Everytheme: ${result.slice(0, 200)}`
           );
         }
       } catch (err: unknown) {
+        logError("Chat failed", err);
         const message = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(`Everytheme error: ${message}`);
       }
     }
   );
+}
+
+// --- Theme selection ---
+
+async function selectTheme() {
+  const presets = themeEngine.listPresets();
+  const activePreset = themeEngine.activePresetName;
+
+  const items: vscode.QuickPickItem[] = [
+    {
+      label: "$(star) Kanagawa Wave",
+      description: "Default",
+      detail: activePreset === null ? "$(check) Active" : undefined,
+    },
+    ...presets.map((p) => ({
+      label: p.name,
+      description: p.description ?? "",
+      detail: p.name === activePreset ? "$(check) Active" : undefined,
+    })),
+  ];
+
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: "Select a theme",
+    matchOnDescription: true,
+  });
+
+  if (!pick) {
+    return;
+  }
+
+  if (pick.label === "$(star) Kanagawa Wave") {
+    await themeEngine.resetTheme();
+    vscode.window.showInformationMessage("Everytheme: Loaded Kanagawa Wave.");
+  } else {
+    const loaded = await themeEngine.loadPreset(pick.label);
+    if (loaded) {
+      vscode.window.showInformationMessage(`Everytheme: Loaded "${pick.label}".`);
+    }
+  }
 }
 
 export function deactivate() {}

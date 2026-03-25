@@ -2,8 +2,13 @@
   "name": "everytheme",
   "displayName": "Everytheme",
   "description": "AI-powered VS Code theme that changes on the fly via natural language",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "everytheme",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NickCody/everytheme"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -26,6 +31,14 @@
         "title": "Everytheme: Change Theme with AI"
       },
       {
+        "command": "everytheme.selectTheme",
+        "title": "Everytheme: Select Theme"
+      },
+      {
+        "command": "everytheme.selectProvider",
+        "title": "Everytheme: Select AI Provider"
+      },
+      {
         "command": "everytheme.reset",
         "title": "Everytheme: Reset to Default"
       }
@@ -36,7 +49,18 @@
         "everytheme.anthropicApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic API key for AI-powered theme changes"
+          "description": "Anthropic API key (also reads ANTHROPIC_API_KEY env var)"
+        },
+        "everytheme.provider": {
+          "type": "string",
+          "enum": ["anthropic", "openai", "gemini"],
+          "default": "",
+          "description": "Preferred AI provider (auto-detected from env vars if not set)"
+        },
+        "everytheme.model": {
+          "type": "string",
+          "default": "",
+          "description": "Preferred model ID (e.g. claude-sonnet-4-20250514, gpt-4.1-mini, gemini-2.0-flash)"
         }
       }
     }
@@ -52,6 +76,8 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.24.0",
+    "openai": "^4.82.0"
   }
 }
