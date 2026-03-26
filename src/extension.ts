@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { ThemeEngine } from "./theme-engine";
 import { THEME_TOOLS, handleToolCall } from "./llm-tools";
-import { detectAllOptions, detectDefaultProvider, type LLMProvider } from "./llm-provider";
+import { detectProviders, detectDefaultProvider, getProviderDescription, type LLMProvider } from "./llm-provider";
 import { initLog, log, logError } from "./log";
 
 let themeEngine: ThemeEngine;
@@ -46,86 +46,62 @@ function saveDefaultThemeIfNeeded(context: vscode.ExtensionContext) {
 // --- Provider selection ---
 
 async function selectProvider() {
-  const options = detectAllOptions();
-  if (options.length === 0) {
+  const providers = detectProviders();
+  if (providers.length === 0) {
     vscode.window.showErrorMessage(
       "Everytheme: No API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY."
     );
     return;
   }
 
-  const items = options.map((o) => {
-    const isActive =
-      activeProvider?.id === o.provider.id &&
-      activeProvider?.model === o.provider.model;
-    return {
-      label: `${o.providerName}: ${o.modelEntry.label}`,
-      description: o.provider.model,
-      detail: isActive
-        ? `$(check) Active — ${o.modelEntry.description}`
-        : o.modelEntry.description,
-      option: o,
-    };
-  });
+  const items = providers.map((p) => ({
+    label: p.label,
+    description: `${p.model}`,
+    detail: p.id === activeProvider?.id
+      ? `$(check) Active — ${getProviderDescription(p.id)}`
+      : getProviderDescription(p.id),
+    provider: p,
+  }));
 
   const pick = await vscode.window.showQuickPick(items, {
-    placeHolder: "Select AI provider and model",
-    matchOnDescription: true,
+    placeHolder: "Select AI provider",
   });
 
   if (pick) {
-    activeProvider = pick.option.provider;
-    const config = vscode.workspace.getConfiguration("everytheme");
-    await config.update("provider", pick.option.provider.id, vscode.ConfigurationTarget.Global);
-    await config.update("model", pick.option.provider.model, vscode.ConfigurationTarget.Global);
-    log(`Provider changed: ${pick.option.providerName} / ${pick.option.provider.model}`);
+    activeProvider = pick.provider;
+    await vscode.workspace
+      .getConfiguration("everytheme")
+      .update("provider", pick.provider.id, vscode.ConfigurationTarget.Global);
+    log(`Provider changed: ${pick.provider.label} / ${pick.provider.model}`);
     vscode.window.showInformationMessage(
-      `Everytheme: Using ${pick.option.providerName} ${pick.option.modelEntry.label}`
+      `Everytheme: Using ${pick.provider.label} (${pick.provider.model})`
     );
   }
 }
 
 // --- Theme chat ---
 
-const SYSTEM_PROMPT = `You are an expert VS Code theme designer.
+const SYSTEM_PROMPT = `You modify VS Code theme colors. You MUST follow these rules exactly.
 
-CRITICAL — DETERMINE INTENT FIRST:
-Read the user's request carefully and determine if they are:
-(A) CREATING A NEW THEME — they say things like "create", "make me a theme", "build a theme", "I want a cyberpunk theme", "give me a new theme". These are requests for a full, new, named theme from scratch.
-(B) TWEAKING THE CURRENT THEME — they say things like "change the background", "make strings blue", "darker sidebar", "increase contrast". These are targeted edits to specific colors on whatever is currently active.
+IMPORTANT: MOST REQUESTS ARE SMALL TWEAKS. Only create a full theme when the user says "create a theme" or "new theme."
 
-DO NOT confuse these. If the user is tweaking, change ONLY the things they mentioned. Do not touch anything else.
+RULES FOR TWEAKS (most requests):
+- "darken the editor background by 10%" → call set_editor_colors with {"colors": {"editor.background": "<new hex>"}}. That's it. ONE key. ONE tool call. Nothing else.
+- "make strings green" → call set_token_colors with ONE rule for strings. Nothing else.
+- "change the sidebar and title bar to navy" → set_editor_colors with 2-3 keys. Nothing else.
+- ONLY set what was explicitly asked. Never set foregrounds when asked about backgrounds. Never set syntax colors when asked about UI colors. Never set extra colors "for consistency."
+- NEVER call reset_theme for a tweak.
+- NEVER call save_preset for a tweak. The engine auto-saves.
+- If the user says "darken by X%", compute the darkened hex value from the current color shown in the theme state.
 
-RULES FOR TWEAKS (intent B):
-- Change ONLY what the user asked for. They may ask for one change or many, but only touch what they mention.
-- Use good judgment about what's implied. "Make the background darker" means editor.background and closely related backgrounds (sidebar, activity bar, panel, terminal) — but NOT foregrounds, syntax colors, or unrelated UI. "Make strings green and comments italic" means exactly those two token changes.
-- If the user lists several changes, apply all of them, but do not go beyond what they asked.
-- Do NOT call reset_theme for tweaks.
-- After tweaking, call save_preset with the SAME preset name (from the current theme state) to update it in place. If there is no active preset, do not save.
-- Keep it minimal. Respect the user's specificity.
+RULES FOR NEW THEMES (only when user says "create", "new theme", "build a theme", "give me a X theme"):
+- Call reset_theme, then set_editor_colors (80+ keys), then set_token_colors (20+ rules), then save_preset. All in one turn.
+- Make a cohesive palette. Ensure contrast. Set all 16 terminal ANSI colors. Use proper TextMate scopes (arrays of strings).
 
-RULES FOR NEW THEMES (intent A):
-- Be COMPREHENSIVE. Set EVERY color category — editor, sidebar, activity bar, status bar, title bar, tabs, terminal, buttons, inputs, dropdowns, lists, badges, scrollbars, minimap, panels, notifications, git decorations, diff editor, debug, peek views, breadcrumbs, and all syntax token colors.
-- A theme is not done until every visible surface has been considered.
-- Colors must work together as a cohesive palette. Pick a base palette of 8-12 colors and derive all specific colors from that palette.
-- Ensure readability: maintain strong contrast between text and backgrounds (WCAG AA minimum).
-- Terminal ANSI colors (all 16) must be set to match the theme mood.
-- Syntax highlighting should cover ALL major categories (20+ rules minimum with proper TextMate scopes as arrays of strings).
-- First call reset_theme to start clean, then set_editor_colors (80+ keys), then set_token_colors (20+ rules), then save_preset with a descriptive name.
-- This ensures you don't contaminate an existing preset.
-
-SPEED — MINIMIZE ROUND TRIPS:
-- The current theme state is included in the user's message. Do NOT call get_current_theme — you already have it.
-- For a new theme: call reset_theme + set_editor_colors + set_token_colors + save_preset ALL IN THE SAME TURN.
-- For a tweak: call only the needed set_editor_colors and/or set_token_colors (+ save_preset if there's an active preset) in one turn.
-- Aim for a single turn of tool calls.
-
-PRESET MANAGEMENT:
-- save_preset: Save current live colors as a named preset.
-- load_preset: Load a saved preset as active (replaces live colors).
-- list_presets / get_preset: Browse and inspect saved presets.
-- clone_preset / rename_preset / delete_preset: Manage presets.
-- When the user references a saved theme by name, use load_preset.`;
+CONTEXT:
+- The current theme state (active preset, colors, token rules) is provided in the user's message. Do NOT call get_current_theme.
+- Make all tool calls in a SINGLE turn.
+- Presets: save_preset, load_preset, list_presets, get_preset, clone_preset, rename_preset, delete_preset.`;
 
 async function openThemeChat() {
   if (!activeProvider) {

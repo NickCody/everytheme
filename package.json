@@ -56,11 +56,6 @@
           "enum": ["anthropic", "openai", "gemini"],
           "default": "",
           "description": "Preferred AI provider (auto-detected from env vars if not set)"
-        },
-        "everytheme.model": {
-          "type": "string",
-          "default": "",
-          "description": "Preferred model ID (e.g. claude-sonnet-4-20250514, gpt-4.1-mini, gemini-2.0-flash)"
         }
       }
     }

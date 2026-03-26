@@ -111,6 +111,7 @@ export class ThemeEngine {
       current,
       vscode.ConfigurationTarget.Global
     );
+    this.autoSaveActivePreset();
     return changed;
   }
 
@@ -157,7 +158,26 @@ export class ThemeEngine {
       { ...tokenConfig, textMateRules: rules },
       vscode.ConfigurationTarget.Global
     );
+    this.autoSaveActivePreset();
     return changed;
+  }
+
+  /** Auto-save to the active preset if one exists */
+  private autoSaveActivePreset(): void {
+    if (this._activePresetName) {
+      const theme = this.getCurrentTheme();
+      const existing = this.getPreset(this._activePresetName);
+      const preset: Preset = {
+        name: this._activePresetName,
+        description: existing?.description,
+        theme,
+      };
+      fs.writeFileSync(
+        this.presetPath(this._activePresetName),
+        JSON.stringify(preset, null, 2),
+        "utf-8"
+      );
+    }
   }
 
   /** Reset theme — clear all color overrides */

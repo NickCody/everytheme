@@ -271,15 +271,22 @@ export const THEME_TOOLS: ToolDef[] = [
   {
     name: "set_editor_colors",
     description:
-      "Set VS Code workbench/editor UI colors. Pass an object mapping color keys to hex values (#RRGGBB or #RRGGBBAA). " +
-      "You should set ALL relevant colors for a cohesive theme — not just a few. " +
-      "Available keys include: " + EDITOR_COLOR_KEYS.join(", "),
+      "Set VS Code workbench/editor UI colors. Pass a 'colors' object mapping VS Code color keys to hex values (#RRGGBB or #RRGGBBAA). " +
+      "For TWEAKS: set ONLY the specific keys the user asked about (1-20 keys). " +
+      "For NEW THEMES: set comprehensively (80+ keys). " +
+      "Key format: 'category.property', e.g. editor.background, sideBar.background, activityBar.background, statusBar.background, " +
+      "tab.activeBackground, titleBar.activeBackground, terminal.background, panel.background, " +
+      "editor.foreground, editor.selectionBackground, editorLineNumber.foreground, editorCursor.foreground, " +
+      "list.activeSelectionBackground, input.background, button.background, badge.background, " +
+      "terminal.ansiBlack/Red/Green/Yellow/Blue/Magenta/Cyan/White (and ansiBright* variants), " +
+      "editorBracketHighlight.foreground1-6, gitDecoration.*, minimap.*, scrollbarSlider.*, etc. " +
+      "Full reference: https://code.visualstudio.com/api/references/theme-color",
     input_schema: {
       type: "object" as const,
       properties: {
         colors: {
           type: "object",
-          description: "Map of VS Code color keys to hex color values. Set as many as needed for a complete theme.",
+          description: "Map of VS Code color keys to hex color values.",
           additionalProperties: { type: "string" },
         },
       },
@@ -289,9 +296,10 @@ export const THEME_TOOLS: ToolDef[] = [
   {
     name: "set_token_colors",
     description:
-      "Set syntax highlighting (TextMate) token colors. Each rule needs a name, a scope (TextMate scope selector), " +
-      "and settings (foreground color, fontStyle). You should set ALL major syntax categories for a complete theme. " +
-      "If a rule with the same name already exists, it will be updated; otherwise a new rule is created. " +
+      "Set syntax highlighting (TextMate) token colors. Each rule needs a name, a scope (array of TextMate scope selectors), " +
+      "and settings (foreground color, fontStyle). If a rule with the same name already exists, it will be updated; otherwise created. " +
+      "For TWEAKS: set ONLY the specific tokens the user asked about. " +
+      "For NEW THEMES: set all major syntax categories (20+ rules). " +
       TOKEN_SCOPE_REFERENCE,
     input_schema: {
       type: "object" as const,

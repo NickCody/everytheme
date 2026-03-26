@@ -30,104 +30,69 @@ export interface LLMProvider {
   run(opts: RunOptions): Promise<string>;
 }
 
-// --- Model catalog ---
+// --- Provider catalog (one model per engine) ---
 
-interface ModelEntry {
+interface ProviderEntry {
   id: string;
   label: string;
+  model: string;
   description: string;
 }
 
-const ANTHROPIC_MODELS: ModelEntry[] = [
-  { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", description: "Fast, great tool use — recommended" },
-  { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", description: "Fastest, cheapest — may be less creative" },
-  { id: "claude-opus-4-6", label: "Claude Opus 4.6", description: "Most capable — slower, expensive" },
-];
-
-const OPENAI_MODELS: ModelEntry[] = [
-  { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Fast, optimized for tool use — recommended" },
-  { id: "gpt-4.1", label: "GPT-4.1", description: "More capable — slower" },
-  { id: "gpt-4.1-nano", label: "GPT-4.1 Nano", description: "Fastest, cheapest — may struggle with large themes" },
-  { id: "gpt-4o", label: "GPT-4o", description: "Multimodal, solid tool use" },
-  { id: "gpt-4o-mini", label: "GPT-4o Mini", description: "Fast and cheap" },
-];
-
-const GEMINI_MODELS: ModelEntry[] = [
-  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", description: "Fast, good structured output — recommended" },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Latest flash model" },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Most capable — slower" },
+const PROVIDERS: ProviderEntry[] = [
+  { id: "anthropic", label: "Anthropic", model: "claude-sonnet-4-20250514", description: "Claude Sonnet 4 — fast, excellent tool use" },
+  { id: "openai", label: "OpenAI", model: "gpt-5.4", description: "GPT-5.4 — strong reasoning and tool use" },
+  { id: "gemini", label: "Gemini", model: "gemini-2.0-flash", description: "Gemini 2.0 Flash — fast, good structured output" },
 ];
 
 // --- Auto-detection ---
 
-export interface ProviderOption {
-  provider: LLMProvider;
-  providerName: string;
-  modelEntry: ModelEntry;
-}
-
-export function detectAllOptions(): ProviderOption[] {
-  const options: ProviderOption[] = [];
+export function detectProviders(): LLMProvider[] {
+  const providers: LLMProvider[] = [];
 
   const anthropicKey =
     vscode.workspace.getConfiguration("everytheme").get<string>("anthropicApiKey") ||
     process.env.ANTHROPIC_API_KEY;
   if (anthropicKey) {
-    for (const m of ANTHROPIC_MODELS) {
-      options.push({
-        provider: new AnthropicProvider(anthropicKey, m.id),
-        providerName: "Anthropic",
-        modelEntry: m,
-      });
-    }
+    const entry = PROVIDERS.find((p) => p.id === "anthropic")!;
+    providers.push(new AnthropicProvider(anthropicKey, entry.model));
   }
 
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
-    for (const m of OPENAI_MODELS) {
-      options.push({
-        provider: new OpenAIProvider(openaiKey, m.id),
-        providerName: "OpenAI",
-        modelEntry: m,
-      });
-    }
+    const entry = PROVIDERS.find((p) => p.id === "openai")!;
+    providers.push(new OpenAIProvider(openaiKey, entry.model));
   }
 
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (geminiKey) {
-    for (const m of GEMINI_MODELS) {
-      options.push({
-        provider: new GeminiProvider(geminiKey, m.id),
-        providerName: "Gemini",
-        modelEntry: m,
-      });
-    }
+    const entry = PROVIDERS.find((p) => p.id === "gemini")!;
+    providers.push(new GeminiProvider(geminiKey, entry.model));
   }
 
-  log(`Detected ${options.length} provider/model options (${[anthropicKey ? "Anthropic" : "", openaiKey ? "OpenAI" : "", geminiKey ? "Gemini" : ""].filter(Boolean).join(", ")} keys found)`);
-  return options;
+  log(`Detected ${providers.length} providers (${providers.map((p) => p.label).join(", ")})`);
+  return providers;
+}
+
+export function getProviderDescription(id: string): string {
+  return PROVIDERS.find((p) => p.id === id)?.description ?? "";
 }
 
 export function detectDefaultProvider(): LLMProvider | undefined {
-  const options = detectAllOptions();
-  if (options.length === 0) {
+  const providers = detectProviders();
+  if (providers.length === 0) {
     return undefined;
   }
 
-  const config = vscode.workspace.getConfiguration("everytheme");
-  const savedProvider = config.get<string>("provider");
-  const savedModel = config.get<string>("model");
-
-  if (savedProvider && savedModel) {
-    const match = options.find(
-      (o) => o.provider.id === savedProvider && o.provider.model === savedModel
-    );
+  const savedId = vscode.workspace.getConfiguration("everytheme").get<string>("provider");
+  if (savedId) {
+    const match = providers.find((p) => p.id === savedId);
     if (match) {
-      return match.provider;
+      return match;
     }
   }
 
-  return options[0].provider;
+  return providers[0];
 }
 
 // --- Anthropic ---
@@ -217,61 +182,86 @@ class OpenAIProvider implements LLMProvider {
   async run(opts: RunOptions): Promise<string> {
     const client = new OpenAI({ apiKey: this.apiKey });
 
-    const tools: OpenAI.ChatCompletionTool[] = opts.tools.map((t) => ({
+    const tools = opts.tools.map((t) => ({
       type: "function" as const,
-      function: {
-        name: t.name,
-        description: t.description,
-        parameters: t.input_schema,
-      },
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema,
     }));
 
-    const messages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: "system", content: opts.systemPrompt },
+    const input: any[] = [
+      { role: "developer", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
     ];
 
-    log(`[OpenAI] Sending turn 1 to ${this.model}...`);
+    log(`[OpenAI] Sending turn 1 to ${this.model} (responses API, reasoning=low)...`);
     let turn = 1;
-    let response = await client.chat.completions.create({
+    let response = await (client as any).responses.create({
       model: this.model,
-      max_tokens: 16384,
-      messages,
+      max_output_tokens: 16384,
+      reasoning: { effort: "low" },
+      input,
       tools,
     });
-    log(`[OpenAI] Turn ${turn} response: finish_reason=${response.choices[0]?.finish_reason}, usage=${JSON.stringify(response.usage)}`);
+    log(`[OpenAI] Turn ${turn} response: status=${response.status}, output=${response.output?.length ?? 0} items, usage=${JSON.stringify(response.usage)}`);
 
-    while (response.choices[0]?.finish_reason === "tool_calls") {
-      const msg = response.choices[0].message;
-      messages.push(msg);
+    // Agentic loop: process function calls
+    while (true) {
+      const functionCalls = (response.output ?? []).filter(
+        (item: any) => item.type === "function_call"
+      );
+      if (functionCalls.length === 0) {
+        break;
+      }
 
-      const toolNames = (msg.tool_calls ?? []).map((tc) => tc.function.name);
+      const toolNames = functionCalls.map((fc: any) => fc.name);
       log(`[OpenAI] Turn ${turn}: ${toolNames.length} tool calls: ${toolNames.join(", ")}`);
 
-      for (const tc of msg.tool_calls ?? []) {
-        opts.onProgress(`Applying: ${tc.function.name}...`);
-        const input = JSON.parse(tc.function.arguments);
-        const result = await opts.handleTool(tc.function.name, input);
-        messages.push({
-          role: "tool",
-          tool_call_id: tc.id,
-          content: result,
+      // Add assistant output to conversation
+      const newInput: any[] = [];
+      for (const item of response.output) {
+        newInput.push(item);
+      }
+
+      // Execute tool calls and add results
+      for (const fc of functionCalls) {
+        opts.onProgress(`Applying: ${fc.name}...`);
+        const args = typeof fc.arguments === "string" ? JSON.parse(fc.arguments) : fc.arguments;
+        const result = await opts.handleTool(fc.name, args);
+        newInput.push({
+          type: "function_call_output",
+          call_id: fc.call_id,
+          output: result,
         });
       }
 
       turn++;
       log(`[OpenAI] Sending turn ${turn}...`);
-      response = await client.chat.completions.create({
+      response = await (client as any).responses.create({
         model: this.model,
-        max_tokens: 16384,
-        messages,
+        max_output_tokens: 16384,
+        reasoning: { effort: "low" },
+        input: [...input, ...newInput],
         tools,
       });
-      log(`[OpenAI] Turn ${turn} response: finish_reason=${response.choices[0]?.finish_reason}, usage=${JSON.stringify(response.usage)}`);
+      log(`[OpenAI] Turn ${turn} response: status=${response.status}, output=${response.output?.length ?? 0} items, usage=${JSON.stringify(response.usage)}`);
+
+      // Accumulate for next iteration
+      input.push(...newInput);
     }
 
+    // Extract text from output
+    const textItems = (response.output ?? []).filter(
+      (item: any) => item.type === "message" && item.content
+    );
+    const text = textItems
+      .flatMap((item: any) => item.content)
+      .filter((c: any) => c.type === "output_text")
+      .map((c: any) => c.text)
+      .join("");
+
     log(`[OpenAI] Complete after ${turn} turns`);
-    return response.choices[0]?.message?.content ?? "";
+    return text;
   }
 }
 
