@@ -28,12 +28,13 @@
 ## Quick Start
 
 1. Install the extension
-2. Set at least one API key as an environment variable:
+2. Provide at least one API key — **either** set an environment variable:
    ```
    ANTHROPIC_API_KEY=sk-ant-...
    OPENAI_API_KEY=sk-...
    GEMINI_API_KEY=...
    ```
+   **or** run **Everytheme: Configure API Keys & Endpoints** from the command palette to set keys directly in VS Code (see [API Key & Endpoint Configuration](#api-key--endpoint-configuration) below).
 3. Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
 4. Run **Everytheme: Change Theme with AI**
 5. Describe your theme
@@ -45,6 +46,7 @@
 | `Everytheme: Change Theme with AI` | Describe a theme in natural language |
 | `Everytheme: Select Theme` | Pick from saved theme presets |
 | `Everytheme: Select AI Provider` | Choose provider and model |
+| `Everytheme: Configure API Keys & Endpoints` | Set API keys and base URLs per provider |
 | `Everytheme: Reset to Default` | Clear all overrides, revert to base |
 
 ## Supported Providers
@@ -52,18 +54,47 @@
 | Provider | Default Model | Env Variable |
 |----------|--------------|--------------|
 | Anthropic | Claude Sonnet 4 | `ANTHROPIC_API_KEY` |
-| OpenAI | GPT-4.1 Mini | `OPENAI_API_KEY` |
+| OpenAI | GPT-5.4 | `OPENAI_API_KEY` |
 | Gemini | Gemini 2.0 Flash | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 
 All available models can be selected via **Everytheme: Select AI Provider**.
+
+## API Key & Endpoint Configuration
+
+Everytheme reads API keys and base URLs from two sources, in priority order:
+
+1. **Everytheme settings** (VS Code user settings, scoped to this extension only)
+2. **Environment variables** (system-wide)
+
+If your environment variables work fine, you don't need to do anything. But if you need to override them — for example, your company sets `OPENAI_BASE_URL` globally and it breaks other tools — you can set values that apply **only to Everytheme**:
+
+1. Run **Everytheme: Configure API Keys & Endpoints** from the command palette
+2. Pick the provider and field (API Key or Base URL)
+3. Enter the value
+
+These overrides are stored in VS Code user settings under `everytheme.*` and do not affect other extensions, CLI tools, or environment variables.
+
+To **clear an override** and fall back to the environment variable / SDK default, use the same command and choose "Clear override", or use "Clear all Everytheme overrides" to reset everything at once.
+
+### Environment variables
+
+| Provider | API Key | Base URL |
+|----------|---------|----------|
+| Anthropic | `ANTHROPIC_API_KEY` | `ANTHROPIC_BASE_URL` |
+| OpenAI | `OPENAI_API_KEY` | `OPENAI_BASE_URL` |
+| Gemini | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | `GOOGLE_API_BASE_URL` |
 
 ## Settings
 
 | Setting | Description |
 |---------|-------------|
-| `everytheme.anthropicApiKey` | Anthropic API key (alternative to env var) |
 | `everytheme.provider` | Preferred provider (`anthropic`, `openai`, `gemini`) |
-| `everytheme.model` | Preferred model ID |
+| `everytheme.anthropicApiKey` | Anthropic API key (overrides env var) |
+| `everytheme.anthropicBaseUrl` | Anthropic base URL (overrides env var) |
+| `everytheme.openaiApiKey` | OpenAI API key (overrides env var) |
+| `everytheme.openaiBaseUrl` | OpenAI base URL (overrides env var) |
+| `everytheme.geminiApiKey` | Gemini API key (overrides env var) |
+| `everytheme.geminiBaseUrl` | Gemini base URL (overrides env var) |
 
 ## Logging
 

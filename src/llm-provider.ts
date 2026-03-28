@@ -47,27 +47,36 @@ const PROVIDERS: ProviderEntry[] = [
 
 // --- Auto-detection ---
 
+/** Read an everytheme setting, returning undefined for empty strings. */
+function setting(key: string): string | undefined {
+  return vscode.workspace.getConfiguration("everytheme").get<string>(key) || undefined;
+}
+
 export function detectProviders(): LLMProvider[] {
   const providers: LLMProvider[] = [];
 
-  const anthropicKey =
-    vscode.workspace.getConfiguration("everytheme").get<string>("anthropicApiKey") ||
-    process.env.ANTHROPIC_API_KEY;
+  // Anthropic: setting > env var
+  const anthropicKey = setting("anthropicApiKey") ?? process.env.ANTHROPIC_API_KEY;
+  const anthropicBaseUrl = setting("anthropicBaseUrl") ?? process.env.ANTHROPIC_BASE_URL;
   if (anthropicKey) {
     const entry = PROVIDERS.find((p) => p.id === "anthropic")!;
-    providers.push(new AnthropicProvider(anthropicKey, entry.model));
+    providers.push(new AnthropicProvider(anthropicKey, entry.model, anthropicBaseUrl));
   }
 
-  const openaiKey = process.env.OPENAI_API_KEY;
+  // OpenAI: setting > env var
+  const openaiKey = setting("openaiApiKey") ?? process.env.OPENAI_API_KEY;
+  const openaiBaseUrl = setting("openaiBaseUrl") ?? process.env.OPENAI_BASE_URL;
   if (openaiKey) {
     const entry = PROVIDERS.find((p) => p.id === "openai")!;
-    providers.push(new OpenAIProvider(openaiKey, entry.model));
+    providers.push(new OpenAIProvider(openaiKey, entry.model, openaiBaseUrl));
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  // Gemini: setting > env var
+  const geminiKey = setting("geminiApiKey") ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+  const geminiBaseUrl = setting("geminiBaseUrl") ?? process.env.GOOGLE_API_BASE_URL;
   if (geminiKey) {
     const entry = PROVIDERS.find((p) => p.id === "gemini")!;
-    providers.push(new GeminiProvider(geminiKey, entry.model));
+    providers.push(new GeminiProvider(geminiKey, entry.model, geminiBaseUrl));
   }
 
   log(`Detected ${providers.length} providers (${providers.map((p) => p.label).join(", ")})`);
@@ -101,10 +110,10 @@ class AnthropicProvider implements LLMProvider {
   id = "anthropic";
   label = "Anthropic";
 
-  constructor(private apiKey: string, public model: string) {}
+  constructor(private apiKey: string, public model: string, private baseURL?: string) {}
 
   async run(opts: RunOptions): Promise<string> {
-    const client = new Anthropic({ apiKey: this.apiKey });
+    const client = new Anthropic({ apiKey: this.apiKey, ...(this.baseURL && { baseURL: this.baseURL }) });
 
     const tools: Anthropic.Tool[] = opts.tools.map((t) => ({
       name: t.name,
@@ -177,10 +186,10 @@ class OpenAIProvider implements LLMProvider {
   id = "openai";
   label = "OpenAI";
 
-  constructor(private apiKey: string, public model: string) {}
+  constructor(private apiKey: string, public model: string, private baseURL?: string) {}
 
   async run(opts: RunOptions): Promise<string> {
-    const client = new OpenAI({ apiKey: this.apiKey });
+    const client = new OpenAI({ apiKey: this.apiKey, ...(this.baseURL && { baseURL: this.baseURL }) });
 
     const tools = opts.tools.map((t) => ({
       type: "function" as const,
@@ -271,10 +280,13 @@ class GeminiProvider implements LLMProvider {
   id = "gemini";
   label = "Gemini";
 
-  constructor(private apiKey: string, public model: string) {}
+  constructor(private apiKey: string, public model: string, private baseURL?: string) {}
 
   async run(opts: RunOptions): Promise<string> {
     const genAI = new GoogleGenerativeAI(this.apiKey);
+    if (this.baseURL) {
+      (genAI as any).baseUrl = this.baseURL;
+    }
 
     const functionDeclarations: FunctionDeclaration[] = opts.tools.map((t) => ({
       name: t.name,

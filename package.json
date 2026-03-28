@@ -41,6 +41,10 @@
       {
         "command": "everytheme.reset",
         "title": "Everytheme: Reset to Default"
+      },
+      {
+        "command": "everytheme.configureProvider",
+        "title": "Everytheme: Configure API Keys & Endpoints"
       }
     ],
     "configuration": {
@@ -49,7 +53,32 @@
         "everytheme.anthropicApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic API key (also reads ANTHROPIC_API_KEY env var)"
+          "description": "Anthropic API key (overrides ANTHROPIC_API_KEY env var)"
+        },
+        "everytheme.anthropicBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API base URL (overrides ANTHROPIC_BASE_URL env var)"
+        },
+        "everytheme.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API key (overrides OPENAI_API_KEY env var)"
+        },
+        "everytheme.openaiBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API base URL (overrides OPENAI_BASE_URL env var)"
+        },
+        "everytheme.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Gemini API key (overrides GEMINI_API_KEY / GOOGLE_API_KEY env var)"
+        },
+        "everytheme.geminiBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Gemini API base URL (overrides GOOGLE_API_BASE_URL env var)"
         },
         "everytheme.provider": {
           "type": "string",

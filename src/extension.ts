@@ -31,7 +31,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("everytheme.reset", async () => {
       await themeEngine.resetTheme();
       vscode.window.showInformationMessage("Everytheme: Reset to defaults.");
-    })
+    }),
+    vscode.commands.registerCommand("everytheme.configureProvider", () => configureProvider())
   );
 }
 
@@ -49,7 +50,7 @@ async function selectProvider() {
   const providers = detectProviders();
   if (providers.length === 0) {
     vscode.window.showErrorMessage(
-      "Everytheme: No API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY."
+      "Everytheme: No API keys found. Run 'Everytheme: Configure API Keys & Endpoints' or set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY env var."
     );
     return;
   }
@@ -76,6 +77,106 @@ async function selectProvider() {
     vscode.window.showInformationMessage(
       `Everytheme: Using ${pick.provider.label} (${pick.provider.model})`
     );
+  }
+}
+
+// --- Provider configuration ---
+
+interface ProviderSettingEntry {
+  providerId: string;
+  providerLabel: string;
+  keySetting: string;
+  keyEnv: string;
+  urlSetting: string;
+  urlEnv: string;
+}
+
+const PROVIDER_SETTINGS: ProviderSettingEntry[] = [
+  { providerId: "anthropic", providerLabel: "Anthropic", keySetting: "anthropicApiKey", keyEnv: "ANTHROPIC_API_KEY", urlSetting: "anthropicBaseUrl", urlEnv: "ANTHROPIC_BASE_URL" },
+  { providerId: "openai", providerLabel: "OpenAI", keySetting: "openaiApiKey", keyEnv: "OPENAI_API_KEY", urlSetting: "openaiBaseUrl", urlEnv: "OPENAI_BASE_URL" },
+  { providerId: "gemini", providerLabel: "Gemini", keySetting: "geminiApiKey", keyEnv: "GEMINI_API_KEY", urlSetting: "geminiBaseUrl", urlEnv: "GOOGLE_API_BASE_URL" },
+];
+
+async function configureProvider() {
+  const cfg = vscode.workspace.getConfiguration("everytheme");
+
+  const items: { label: string; description: string; entry: ProviderSettingEntry | undefined; field: "key" | "url" | "clear" }[] = [];
+
+  for (const p of PROVIDER_SETTINGS) {
+    const currentKey = cfg.get<string>(p.keySetting);
+    const envKey = process.env[p.keyEnv];
+    const currentUrl = cfg.get<string>(p.urlSetting);
+    const envUrl = process.env[p.urlEnv];
+
+    items.push({
+      label: `${p.providerLabel}: API Key`,
+      description: currentKey ? "$(key) Set in Everytheme" : envKey ? `$(key) From ${p.keyEnv}` : "$(warning) Not set",
+      entry: p,
+      field: "key",
+    });
+    items.push({
+      label: `${p.providerLabel}: Base URL`,
+      description: currentUrl ? `$(globe) ${currentUrl}` : envUrl ? `$(globe) From ${p.urlEnv}` : "$(globe) SDK default",
+      entry: p,
+      field: "url",
+    });
+  }
+
+  items.push({
+    label: "$(trash) Clear all Everytheme overrides",
+    description: "Restore env-var / SDK defaults for all providers",
+    entry: undefined,
+    field: "clear",
+  });
+
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: "Configure API keys and endpoints (Everytheme-only, won't affect other tools)",
+  });
+  if (!pick) { return; }
+
+  if (pick.field === "clear") {
+    for (const p of PROVIDER_SETTINGS) {
+      await cfg.update(p.keySetting, undefined, vscode.ConfigurationTarget.Global);
+      await cfg.update(p.urlSetting, undefined, vscode.ConfigurationTarget.Global);
+    }
+    activeProvider = detectDefaultProvider();
+    vscode.window.showInformationMessage("Everytheme: All overrides cleared. Using env vars / SDK defaults.");
+    return;
+  }
+
+  const entry = pick.entry!;
+  const settingKey = pick.field === "key" ? entry.keySetting : entry.urlSetting;
+  const currentValue = cfg.get<string>(settingKey) || "";
+  const fieldLabel = pick.field === "key" ? "API Key" : "Base URL";
+
+  const items2: vscode.QuickPickItem[] = [
+    { label: `$(pencil) Set ${entry.providerLabel} ${fieldLabel}`, description: currentValue ? `Current: ${pick.field === "key" ? "••••" + currentValue.slice(-4) : currentValue}` : undefined },
+    { label: `$(trash) Clear override`, description: "Fall back to env var / SDK default" },
+  ];
+
+  const action = await vscode.window.showQuickPick(items2, {
+    placeHolder: `${entry.providerLabel} ${fieldLabel}`,
+  });
+  if (!action) { return; }
+
+  if (action.label.includes("Clear")) {
+    await cfg.update(settingKey, undefined, vscode.ConfigurationTarget.Global);
+    activeProvider = detectDefaultProvider();
+    vscode.window.showInformationMessage(`Everytheme: ${entry.providerLabel} ${fieldLabel} override cleared.`);
+    return;
+  }
+
+  const value = await vscode.window.showInputBox({
+    prompt: `Enter ${entry.providerLabel} ${fieldLabel}`,
+    value: currentValue,
+    password: pick.field === "key",
+    placeHolder: pick.field === "key" ? "sk-..." : "https://api.example.com/v1",
+  });
+
+  if (value !== undefined) {
+    await cfg.update(settingKey, value || undefined, vscode.ConfigurationTarget.Global);
+    activeProvider = detectDefaultProvider();
+    vscode.window.showInformationMessage(`Everytheme: ${entry.providerLabel} ${fieldLabel} updated.`);
   }
 }
 
@@ -108,7 +209,7 @@ async function openThemeChat() {
     activeProvider = detectDefaultProvider();
     if (!activeProvider) {
       vscode.window.showErrorMessage(
-        "Everytheme: No API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY."
+        "Everytheme: No API keys found. Run 'Everytheme: Configure API Keys & Endpoints' or set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY env var."
       );
       return;
     }
