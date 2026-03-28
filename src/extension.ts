@@ -4,6 +4,7 @@ import * as path from "path";
 import { ThemeEngine } from "./theme-engine";
 import { THEME_TOOLS, handleToolCall } from "./llm-tools";
 import { detectProviders, detectDefaultProvider, getProviderDescription, type LLMProvider } from "./llm-provider";
+import { addEntry, getHistory } from "./chat-history";
 import { initLog, log, logError } from "./log";
 
 let themeEngine: ThemeEngine;
@@ -256,13 +257,17 @@ async function openThemeChat() {
         log(`Chat request: provider=${activeProvider!.id} model=${activeProvider!.model}`);
         log(`User prompt: ${userPrompt}`);
         log(`Context: activePreset=${currentState.activePreset ?? "none"}, ${Object.keys(currentState.editorColors).length} editor colors, ${currentState.tokenColors.length} token rules, ${presets.length} saved presets`);
+        log(`Chat history: ${getHistory().length} prior entries`);
 
+        const toolCallNames: string[] = [];
         const startTime = Date.now();
         const result = await activeProvider!.run({
           systemPrompt: SYSTEM_PROMPT,
           userPrompt: enrichedPrompt,
           tools: THEME_TOOLS,
+          history: getHistory(),
           handleTool: async (name, input) => {
+            toolCallNames.push(name);
             const inputJson = JSON.stringify(input);
             if (name === "set_editor_colors") {
               log(`Tool call: ${name} — ${Object.keys((input as any).colors ?? {}).length} colors, raw keys: ${JSON.stringify(Object.keys(input)).slice(0, 500)}`);
@@ -281,6 +286,13 @@ async function openThemeChat() {
           onProgress: (msg) => progress.report({ message: msg }),
         });
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        // Record this exchange in chat history for future context
+        addEntry({
+          userPrompt,
+          toolCalls: toolCallNames,
+          assistantResponse: result || "(no response)",
+        });
 
         log(`Chat complete in ${elapsed}s`);
         if (result) {

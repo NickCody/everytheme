@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GoogleGenerativeAI, type FunctionDeclaration, SchemaType, type Part } from "@google/generative-ai";
 import { log, logError } from "./log";
+import type { ChatEntry } from "./chat-history";
 
 export interface ToolDef {
   name: string;
@@ -21,6 +22,8 @@ export interface RunOptions {
   tools: ToolDef[];
   handleTool: ToolHandler;
   onProgress: (msg: string) => void;
+  /** Prior conversation entries for continuity across requests */
+  history?: readonly ChatEntry[];
 }
 
 export interface LLMProvider {
@@ -121,9 +124,19 @@ class AnthropicProvider implements LLMProvider {
       input_schema: t.input_schema as Anthropic.Tool["input_schema"],
     }));
 
-    let messages: Anthropic.MessageParam[] = [
-      { role: "user", content: opts.userPrompt },
-    ];
+    // Build message history for conversation continuity
+    let messages: Anthropic.MessageParam[] = [];
+    if (opts.history?.length) {
+      for (const entry of opts.history) {
+        messages.push({ role: "user", content: entry.userPrompt });
+        const summary = entry.toolCalls.length > 0
+          ? `[Called: ${entry.toolCalls.join(", ")}] ${entry.assistantResponse}`
+          : entry.assistantResponse;
+        messages.push({ role: "assistant", content: summary });
+      }
+      log(`[Anthropic] Including ${opts.history.length} history entries`);
+    }
+    messages.push({ role: "user", content: opts.userPrompt });
 
     log(`[Anthropic] Sending turn 1 to ${this.model}...`);
     let turn = 1;
@@ -198,10 +211,21 @@ class OpenAIProvider implements LLMProvider {
       parameters: t.input_schema,
     }));
 
+    // Build input with conversation history for continuity
     const input: any[] = [
       { role: "developer", content: opts.systemPrompt },
-      { role: "user", content: opts.userPrompt },
     ];
+    if (opts.history?.length) {
+      for (const entry of opts.history) {
+        input.push({ role: "user", content: entry.userPrompt });
+        const summary = entry.toolCalls.length > 0
+          ? `[Called: ${entry.toolCalls.join(", ")}] ${entry.assistantResponse}`
+          : entry.assistantResponse;
+        input.push({ role: "assistant", content: summary });
+      }
+      log(`[OpenAI] Including ${opts.history.length} history entries`);
+    }
+    input.push({ role: "user", content: opts.userPrompt });
 
     log(`[OpenAI] Sending turn 1 to ${this.model} (responses API, reasoning=low)...`);
     let turn = 1;
@@ -300,7 +324,20 @@ class GeminiProvider implements LLMProvider {
       tools: [{ functionDeclarations }],
     });
 
-    const chat = model.startChat();
+    // Build chat history for conversation continuity
+    const chatHistory: { role: string; parts: { text: string }[] }[] = [];
+    if (opts.history?.length) {
+      for (const entry of opts.history) {
+        chatHistory.push({ role: "user", parts: [{ text: entry.userPrompt }] });
+        const summary = entry.toolCalls.length > 0
+          ? `[Called: ${entry.toolCalls.join(", ")}] ${entry.assistantResponse}`
+          : entry.assistantResponse;
+        chatHistory.push({ role: "model", parts: [{ text: summary }] });
+      }
+      log(`[Gemini] Including ${opts.history.length} history entries`);
+    }
+
+    const chat = model.startChat({ history: chatHistory });
     log(`[Gemini] Sending turn 1 to ${this.model}...`);
     let turn = 1;
     let result = await chat.sendMessage(opts.userPrompt);
