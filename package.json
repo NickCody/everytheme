@@ -2,7 +2,7 @@
   "name": "everytheme",
   "displayName": "Everytheme",
   "description": "AI-powered VS Code theme that changes on the fly via natural language",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "publisher": "everytheme",
   "icon": "icon.png",
   "repository": {
@@ -92,7 +92,9 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "rm -f everytheme-*.vsix && tsc -p ./ && vsce package",
+    "package:install": "rm -f everytheme-*.vsix && tsc -p ./ && vsce package && code --install-extension everytheme-*.vsix --force"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
