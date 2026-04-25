@@ -1,220 +1,48 @@
 import { type ToolDef } from "./llm-provider";
-import { ThemeEngine } from "./theme-engine";
+import { ThemeEngine, VALID_COLOR_KEYS, COLOR_KEYS_META } from "./theme-engine";
 
-// Exhaustive list so the LLM knows the full surface area
-const EDITOR_COLOR_KEYS = [
-  // Editor
-  "editor.background", "editor.foreground", "editor.selectionBackground",
-  "editor.selectionForeground", "editor.selectionHighlightBackground",
-  "editor.selectionHighlightBorder", "editor.inactiveSelectionBackground",
-  "editor.wordHighlightBackground", "editor.wordHighlightBorder",
-  "editor.wordHighlightStrongBackground", "editor.wordHighlightStrongBorder",
-  "editor.findMatchBackground", "editor.findMatchBorder",
-  "editor.findMatchHighlightBackground", "editor.findMatchHighlightBorder",
-  "editor.hoverHighlightBackground", "editor.lineHighlightBackground",
-  "editor.lineHighlightBorder", "editor.rangeHighlightBackground",
-  "editor.snippetTabstopHighlightBackground",
-  "editorCursor.background", "editorCursor.foreground",
-  "editorWhitespace.foreground",
-  "editorIndentGuide.background1", "editorIndentGuide.activeBackground1",
-  "editorLineNumber.foreground", "editorLineNumber.activeForeground",
-  "editorRuler.foreground",
-  "editorBracketMatch.background", "editorBracketMatch.border",
-  "editorBracketHighlight.foreground1", "editorBracketHighlight.foreground2",
-  "editorBracketHighlight.foreground3", "editorBracketHighlight.foreground4",
-  "editorBracketHighlight.foreground5", "editorBracketHighlight.foreground6",
-  "editorBracketHighlight.unexpectedBracket.foreground",
-  "editorBracketPairGuide.activeBackground1", "editorBracketPairGuide.activeBackground2",
-  "editorBracketPairGuide.activeBackground3", "editorBracketPairGuide.activeBackground4",
-  "editorBracketPairGuide.activeBackground5", "editorBracketPairGuide.activeBackground6",
-  "editorOverviewRuler.border",
-  "editorOverviewRuler.findMatchForeground",
-  "editorOverviewRuler.errorForeground", "editorOverviewRuler.warningForeground",
-  "editorOverviewRuler.infoForeground",
-  "editorOverviewRuler.modifiedForeground", "editorOverviewRuler.addedForeground",
-  "editorOverviewRuler.deletedForeground",
-  "editorError.foreground", "editorWarning.foreground", "editorInfo.foreground",
-  "editorHint.foreground",
-  "editorGutter.background", "editorGutter.modifiedBackground",
-  "editorGutter.addedBackground", "editorGutter.deletedBackground",
-  "editorGutter.foldingControlForeground",
-  // Editor widgets
-  "editorWidget.background", "editorWidget.foreground", "editorWidget.border",
-  "editorSuggestWidget.background", "editorSuggestWidget.border",
-  "editorSuggestWidget.foreground", "editorSuggestWidget.selectedBackground",
-  "editorSuggestWidget.selectedForeground", "editorSuggestWidget.highlightForeground",
-  "editorSuggestWidget.focusHighlightForeground",
-  "editorHoverWidget.background", "editorHoverWidget.foreground",
-  "editorHoverWidget.border", "editorHoverWidget.highlightForeground",
-  "editorHoverWidget.statusBarBackground",
-  "editorMarkerNavigation.background",
-  "editorInlayHint.foreground", "editorInlayHint.background",
-  // Peek view
-  "peekView.border", "peekViewEditor.background",
-  "peekViewEditor.matchHighlightBackground",
-  "peekViewResult.background", "peekViewResult.foreground",
-  "peekViewResult.fileForeground", "peekViewResult.lineForeground",
-  "peekViewResult.matchHighlightBackground", "peekViewResult.selectionBackground",
-  "peekViewResult.selectionForeground",
-  "peekViewTitle.background", "peekViewTitleLabel.foreground",
-  "peekViewTitleDescription.foreground",
-  // Diff editor
-  "diffEditor.insertedTextBackground", "diffEditor.insertedTextBorder",
-  "diffEditor.removedTextBackground", "diffEditor.removedTextBorder",
-  "diffEditor.diagonalFill",
-  // Editor group / tabs
-  "editorGroup.border", "editorGroup.dropBackground",
-  "editorGroupHeader.tabsBackground", "editorGroupHeader.tabsBorder",
-  "tab.activeBackground", "tab.activeForeground", "tab.activeBorder",
-  "tab.activeBorderTop", "tab.activeModifiedBorder",
-  "tab.inactiveBackground", "tab.inactiveForeground", "tab.inactiveModifiedBorder",
-  "tab.unfocusedActiveBackground", "tab.unfocusedActiveForeground",
-  "tab.unfocusedActiveBorder", "tab.unfocusedActiveBorderTop",
-  "tab.unfocusedInactiveBackground", "tab.unfocusedInactiveForeground",
-  "tab.unfocusedHoverBackground", "tab.hoverBackground",
-  "tab.hoverBorder", "tab.border", "tab.lastPinnedBorder",
-  // Activity bar
-  "activityBar.background", "activityBar.foreground",
-  "activityBar.inactiveForeground", "activityBar.border",
-  "activityBar.activeBorder", "activityBar.activeBackground",
-  "activityBar.activeFocusBorder",
-  "activityBarBadge.background", "activityBarBadge.foreground",
-  // Side bar
-  "sideBar.background", "sideBar.foreground", "sideBar.border",
-  "sideBar.dropBackground",
-  "sideBarTitle.foreground",
-  "sideBarSectionHeader.background", "sideBarSectionHeader.foreground",
-  "sideBarSectionHeader.border",
-  // Minimap
-  "minimap.findMatchHighlight", "minimap.selectionHighlight",
-  "minimap.errorHighlight", "minimap.warningHighlight",
-  "minimap.background",
-  "minimapSlider.background", "minimapSlider.hoverBackground",
-  "minimapSlider.activeBackground",
-  "minimapGutter.addedBackground", "minimapGutter.modifiedBackground",
-  "minimapGutter.deletedBackground",
-  // Status bar
-  "statusBar.background", "statusBar.foreground", "statusBar.border",
-  "statusBar.noFolderBackground", "statusBar.noFolderForeground",
-  "statusBar.debuggingBackground", "statusBar.debuggingForeground",
-  "statusBar.debuggingBorder",
-  "statusBarItem.hoverBackground",
-  "statusBarItem.activeBackground",
-  "statusBarItem.prominentForeground", "statusBarItem.prominentBackground",
-  "statusBarItem.prominentHoverBackground",
-  "statusBarItem.remoteBackground", "statusBarItem.remoteForeground",
-  "statusBarItem.errorBackground", "statusBarItem.errorForeground",
-  "statusBarItem.warningBackground", "statusBarItem.warningForeground",
-  // Title bar
-  "titleBar.activeBackground", "titleBar.activeForeground",
-  "titleBar.inactiveBackground", "titleBar.inactiveForeground",
-  "titleBar.border",
-  // Menu
-  "menubar.selectionBackground", "menubar.selectionForeground",
-  "menu.background", "menu.foreground", "menu.selectionBackground",
-  "menu.selectionForeground", "menu.selectionBorder",
-  "menu.separatorBackground", "menu.border",
-  // Command center / notifications
-  "commandCenter.foreground", "commandCenter.background", "commandCenter.border",
-  "commandCenter.activeForeground", "commandCenter.activeBackground",
-  "commandCenter.activeBorder",
-  "notificationCenter.border", "notificationCenterHeader.foreground",
-  "notificationCenterHeader.background",
-  "notifications.foreground", "notifications.background", "notifications.border",
-  "notificationLink.foreground",
-  "notificationsErrorIcon.foreground", "notificationsWarningIcon.foreground",
-  "notificationsInfoIcon.foreground",
-  // Banner
-  "banner.background", "banner.foreground", "banner.iconForeground",
-  // Buttons
-  "button.background", "button.foreground", "button.hoverBackground",
-  "button.secondaryBackground", "button.secondaryForeground",
-  "button.secondaryHoverBackground",
-  // Dropdown / input / checkbox
-  "dropdown.background", "dropdown.foreground", "dropdown.border",
-  "input.background", "input.foreground", "input.border",
-  "input.placeholderForeground",
-  "inputOption.activeBorder", "inputOption.activeBackground",
-  "inputOption.activeForeground",
-  "inputValidation.errorBackground", "inputValidation.errorBorder",
-  "inputValidation.warningBackground", "inputValidation.warningBorder",
-  "inputValidation.infoBackground", "inputValidation.infoBorder",
-  "checkbox.background", "checkbox.foreground", "checkbox.border",
-  // Scrollbar
-  "scrollbar.shadow",
-  "scrollbarSlider.activeBackground", "scrollbarSlider.background",
-  "scrollbarSlider.hoverBackground",
-  // Badge
-  "badge.background", "badge.foreground",
-  // Progress bar
-  "progressBar.background",
-  // Lists / trees
-  "list.activeSelectionBackground", "list.activeSelectionForeground",
-  "list.activeSelectionIconForeground",
-  "list.inactiveSelectionBackground", "list.inactiveSelectionForeground",
-  "list.inactiveSelectionIconForeground",
-  "list.hoverBackground", "list.hoverForeground",
-  "list.focusBackground", "list.focusForeground", "list.focusOutline",
-  "list.highlightForeground", "list.focusHighlightForeground",
-  "list.invalidItemForeground", "list.errorForeground", "list.warningForeground",
-  "list.filterMatchBackground", "list.filterMatchBorder",
-  "listFilterWidget.background", "listFilterWidget.outline",
-  "listFilterWidget.noMatchesOutline",
-  "tree.indentGuidesStroke", "tree.tableColumnsBorder",
-  // Git
-  "gitDecoration.addedResourceForeground", "gitDecoration.modifiedResourceForeground",
-  "gitDecoration.deletedResourceForeground", "gitDecoration.renamedResourceForeground",
-  "gitDecoration.untrackedResourceForeground", "gitDecoration.ignoredResourceForeground",
-  "gitDecoration.conflictingResourceForeground",
-  "gitDecoration.stageDeletedResourceForeground", "gitDecoration.stageModifiedResourceForeground",
-  // Breadcrumbs
-  "breadcrumb.foreground", "breadcrumb.focusForeground",
-  "breadcrumb.activeSelectionForeground",
-  "breadcrumbPicker.background",
-  // Panel
-  "panel.background", "panel.border", "panel.dropBorder",
-  "panelTitle.activeBorder", "panelTitle.activeForeground",
-  "panelTitle.inactiveForeground",
-  "panelSection.border", "panelSection.dropBackground",
-  "panelSectionHeader.background", "panelSectionHeader.foreground",
-  "panelSectionHeader.border",
-  // Terminal
-  "terminal.background", "terminal.foreground", "terminal.border",
-  "terminal.selectionBackground", "terminal.selectionForeground",
-  "terminalCursor.background", "terminalCursor.foreground",
-  "terminal.ansiBlack", "terminal.ansiRed", "terminal.ansiGreen",
-  "terminal.ansiYellow", "terminal.ansiBlue", "terminal.ansiMagenta",
-  "terminal.ansiCyan", "terminal.ansiWhite",
-  "terminal.ansiBrightBlack", "terminal.ansiBrightRed", "terminal.ansiBrightGreen",
-  "terminal.ansiBrightYellow", "terminal.ansiBrightBlue", "terminal.ansiBrightMagenta",
-  "terminal.ansiBrightCyan", "terminal.ansiBrightWhite",
-  // Debug
-  "debugToolBar.background", "debugToolBar.border",
-  "debugIcon.breakpointForeground", "debugIcon.breakpointDisabledForeground",
-  "debugIcon.startForeground", "debugIcon.pauseForeground",
-  "debugIcon.stopForeground", "debugIcon.stepOverForeground",
-  "debugIcon.stepIntoForeground", "debugIcon.stepOutForeground",
-  "debugIcon.continueForeground", "debugIcon.disconnectForeground",
-  "debugConsole.infoForeground", "debugConsole.warningForeground",
-  "debugConsole.errorForeground", "debugConsole.sourceForeground",
-  "debugConsoleInputIcon.foreground",
-  // Welcome / walkthrough
-  "walkThrough.embeddedEditorBackground",
-  "welcomePage.tileBackground", "welcomePage.tileBorder",
-  "welcomePage.progress.foreground", "welcomePage.progress.background",
-  // Text
-  "textBlockQuote.background", "textBlockQuote.border",
-  "textCodeBlock.background",
-  "textLink.foreground", "textLink.activeForeground",
-  "textPreformat.foreground",
-  // Misc
-  "foreground", "focusBorder", "disabledForeground",
-  "widget.shadow", "selection.background",
-  "descriptionForeground", "errorForeground",
-  "icon.foreground",
-  "sash.hoverBorder",
-  "window.activeBorder", "window.inactiveBorder",
-];
+// The authoritative set of valid VS Code color keys lives in
+// src/vscode-color-keys.json, generated from the canonical docs by
+// `npm run update-color-keys` (see scripts/generate-color-keys.mjs).
+// Import it via VALID_COLOR_KEYS / COLOR_KEYS_META from theme-engine.
+
+// Build a case-insensitive lookup once so we can cheaply suggest corrections
+// for LLM-provided keys that differ only in casing.
+const CI_LOOKUP = new Map<string, string>();
+for (const key of VALID_COLOR_KEYS) {
+  CI_LOOKUP.set(key.toLowerCase(), key);
+}
+
+/** Find a plausible valid color key for a mistyped one. Cheap — meant to help
+ *  the LLM self-correct when it gets casing or a common suffix wrong. */
+function suggestColorKey(bad: string): string | undefined {
+  const hit = CI_LOOKUP.get(bad.toLowerCase());
+  if (hit) return hit;
+  // Prefix match within the same category (e.g. "editor.foo" → any editor.*).
+  const dot = bad.indexOf(".");
+  if (dot > 0) {
+    const prefix = bad.slice(0, dot + 1).toLowerCase();
+    const suffix = bad.slice(dot + 1).toLowerCase();
+    let best: string | undefined;
+    let bestLen = 0;
+    for (const key of VALID_COLOR_KEYS) {
+      const lk = key.toLowerCase();
+      if (!lk.startsWith(prefix)) continue;
+      const ks = lk.slice(prefix.length);
+      // Prefer the one with the longest shared-start with the user's suffix.
+      let shared = 0;
+      while (shared < suffix.length && shared < ks.length && suffix[shared] === ks[shared]) {
+        shared++;
+      }
+      if (shared > bestLen) {
+        bestLen = shared;
+        best = key;
+      }
+    }
+    if (best && bestLen >= 3) return best;
+  }
+  return undefined;
+}
 
 const TOKEN_SCOPE_REFERENCE = `
 When setting token colors, each rule needs a "scope" (TextMate scope selector) that determines what syntax it matches.
@@ -271,16 +99,18 @@ export const THEME_TOOLS: ToolDef[] = [
   {
     name: "set_editor_colors",
     description:
-      "Set VS Code workbench/editor UI colors. Pass a 'colors' object mapping VS Code color keys to hex values (#RRGGBB or #RRGGBBAA). " +
-      "For TWEAKS: set ONLY the specific keys the user asked about (1-20 keys). " +
-      "For NEW THEMES: set comprehensively (80+ keys). " +
-      "Key format: 'category.property', e.g. editor.background, sideBar.background, activityBar.background, statusBar.background, " +
-      "tab.activeBackground, titleBar.activeBackground, terminal.background, panel.background, " +
-      "editor.foreground, editor.selectionBackground, editorLineNumber.foreground, editorCursor.foreground, " +
-      "list.activeSelectionBackground, input.background, button.background, badge.background, " +
-      "terminal.ansiBlack/Red/Green/Yellow/Blue/Magenta/Cyan/White (and ansiBright* variants), " +
-      "editorBracketHighlight.foreground1-6, gitDecoration.*, minimap.*, scrollbarSlider.*, etc. " +
-      "Full reference: https://code.visualstudio.com/api/references/theme-color",
+      `Set VS Code workbench/editor UI colors. Pass a 'colors' object mapping VS Code color keys to hex values (#RRGGBB or #RRGGBBAA). ` +
+      `Keys are validated against the official VS Code theme-color registry (${COLOR_KEYS_META.count} valid ids). ` +
+      `UNKNOWN KEYS ARE REJECTED and reported back in the tool response — if you see "unknown keys" in the result, fix the spelling and call the tool again. ` +
+      `For TWEAKS: set ONLY the specific keys the user asked about (1-20 keys). ` +
+      `For NEW THEMES: set comprehensively (80+ keys). ` +
+      `Key format: 'category.property', e.g. editor.background, sideBar.background, activityBar.background, statusBar.background, ` +
+      `tab.activeBackground, titleBar.activeBackground, terminal.background, panel.background, ` +
+      `editor.foreground, editor.selectionBackground, editorLineNumber.foreground, editorCursor.foreground, ` +
+      `list.activeSelectionBackground, input.background, button.background, badge.background, ` +
+      `terminal.ansiBlack/Red/Green/Yellow/Blue/Magenta/Cyan/White (and ansiBright* variants), ` +
+      `editorBracketHighlight.foreground1-6, gitDecoration.*, minimap.*, scrollbarSlider.*, etc. ` +
+      `Full reference: ${COLOR_KEYS_META.source}`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -460,8 +290,28 @@ export async function handleToolCall(
       if (!colors || Object.keys(colors).length === 0) {
         return "No colors provided — pass a 'colors' object with VS Code color keys mapped to hex values like {\"colors\": {\"editor.background\": \"#000000\"}}.";
       }
-      const changed = await engine.setColors(colors);
-      return `Updated ${changed.length} editor colors: ${changed.join(", ")}`;
+      const { changed, unknownKeys, invalidHex } = await engine.setColors(colors);
+      const parts: string[] = [`Applied ${changed.length} / ${Object.keys(colors).length} editor colors.`];
+      if (changed.length > 0) {
+        parts.push(`Applied: ${changed.join(", ")}.`);
+      }
+      if (unknownKeys.length > 0) {
+        const suggestions = unknownKeys
+          .slice(0, 10)
+          .map((k) => {
+            const match = suggestColorKey(k);
+            return match ? `${k} → did you mean "${match}"?` : k;
+          })
+          .join("; ");
+        parts.push(
+          `REJECTED ${unknownKeys.length} unknown key(s) not in the VS Code theme-color registry: ${suggestions}. ` +
+            `Only use valid ids from ${COLOR_KEYS_META.source} — if the user's request requires these, retry with corrected ids.`
+        );
+      }
+      if (invalidHex.length > 0) {
+        parts.push(`REJECTED ${invalidHex.length} invalid hex value(s): ${invalidHex.join(", ")}. Use #RRGGBB or #RRGGBBAA.`);
+      }
+      return parts.join(" ");
     }
     case "set_token_colors": {
       // Models sometimes put rules at the top level instead of under "updates"

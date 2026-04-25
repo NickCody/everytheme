@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GoogleGenerativeAI, type FunctionDeclaration, SchemaType, type Part } from "@google/generative-ai";
 import { log, logError } from "./log";
-import type { ChatEntry } from "./chat-history";
+import type { ChatEntry } from "./conversation-store";
 
 export interface ToolDef {
   name: string;

@@ -2,7 +2,7 @@
   "name": "everytheme",
   "displayName": "Everytheme",
   "description": "AI-powered VS Code theme that changes on the fly via natural language",
-  "version": "0.1.2",
+  "version": "0.2.4",
   "publisher": "everytheme",
   "icon": "icon.png",
   "repository": {
@@ -45,8 +45,30 @@
       {
         "command": "everytheme.configureProvider",
         "title": "Everytheme: Configure API Keys & Endpoints"
+      },
+      {
+        "command": "everytheme.newConversation",
+        "title": "Everytheme: New Chat Conversation"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "everytheme",
+          "title": "Everytheme",
+          "icon": "icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "everytheme": [
+        {
+          "type": "webview",
+          "id": "everytheme.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
     "configuration": {
       "title": "Everytheme",
       "properties": {
@@ -82,7 +104,11 @@
         },
         "everytheme.provider": {
           "type": "string",
-          "enum": ["anthropic", "openai", "gemini"],
+          "enum": [
+            "anthropic",
+            "openai",
+            "gemini"
+          ],
           "default": "",
           "description": "Preferred AI provider (auto-detected from env vars if not set)"
         }
@@ -91,14 +117,16 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/copy-assets.mjs",
     "watch": "tsc -watch -p ./",
-    "package": "rm -f everytheme-*.vsix && tsc -p ./ && vsce package",
-    "package:install": "rm -f everytheme-*.vsix && tsc -p ./ && vsce package && code --install-extension everytheme-*.vsix --force"
+    "package": "rm -f everytheme-*.vsix && npm run compile && vsce package",
+    "package:install": "rm -f everytheme-*.vsix && npm run compile && vsce package && code --install-extension everytheme-*.vsix --force",
+    "update-color-keys": "node scripts/generate-color-keys.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "marked": "^12.0.2",
     "typescript": "^5.3.0"
   },
   "dependencies": {
