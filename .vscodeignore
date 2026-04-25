@@ -1,9 +1,12 @@
 src/**
 scripts/**
+node_modules/**
 .vscode/**
 .claude/**
 .github/**
 .gitignore
+CLAUDE.md
 tsconfig.json
+everytheme-*.vsix
 **/*.ts
 **/*.map

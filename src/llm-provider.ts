@@ -44,7 +44,7 @@ interface ProviderEntry {
 
 const PROVIDERS: ProviderEntry[] = [
   { id: "anthropic", label: "Anthropic", model: "claude-sonnet-4-20250514", description: "Claude Sonnet 4 — fast, excellent tool use" },
-  { id: "openai", label: "OpenAI", model: "gpt-5.4", description: "GPT-5.4 — strong reasoning and tool use" },
+  { id: "openai", label: "OpenAI", model: "gpt-5.5", description: "GPT-5.5 — strong reasoning and tool use" },
   { id: "gemini", label: "Gemini", model: "gemini-2.0-flash", description: "Gemini 2.0 Flash — fast, good structured output" },
 ];
 

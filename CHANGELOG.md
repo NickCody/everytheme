@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.7
+
+- Bundle the extension with esbuild. Package shrinks from 923 files / 1.2MB to ~19 files / ~246KB; faster activation. Build scripts: `npm run compile` for dev (sourcemaps), `npm run compile:prod` for minified, `npm run watch` for dev rebuild, `npm run typecheck` for tsc-only checks. `vsce package` now runs typecheck + production build via `vscode:prepublish`.
+
+## 0.2.6
+
+- Ship Kanacobolt, Kanaforest, and Kanindigo as built-in presets in `presets/`. Engine merges built-ins with user presets in `globalStorage`; user copies shadow built-ins of the same name (deleting a customized copy restores the bundled version). Built-ins can't be renamed; clone instead.
+
+## 0.2.5
+
+- Bump OpenAI default model from GPT-5.4 to GPT-5.5
+
 ## 0.2.4
 
 - User chat bubble width bumped from 75% to 85%

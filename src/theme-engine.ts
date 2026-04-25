@@ -36,6 +36,7 @@ export interface ThemeData {
 export interface PresetInfo {
   name: string;
   description?: string;
+  builtIn?: boolean;
 }
 
 export interface Preset extends PresetInfo {
@@ -44,12 +45,14 @@ export interface Preset extends PresetInfo {
 
 export class ThemeEngine {
   private presetsDir: string;
+  private builtInPresetsDir: string;
   private statePath: string;
   private basePath: string;
   private _activePresetName: string | null = null;
 
   constructor(private context: vscode.ExtensionContext) {
     this.presetsDir = path.join(context.globalStorageUri.fsPath, "presets");
+    this.builtInPresetsDir = path.join(context.extensionPath, "presets");
     this.statePath = path.join(context.globalStorageUri.fsPath, "state.json");
     this.basePath = path.join(context.extensionPath, "themes", "everytheme-color-theme.json");
     fs.mkdirSync(this.presetsDir, { recursive: true });
@@ -265,25 +268,54 @@ export class ThemeEngine {
 
   // --- Preset management ---
 
+  private safeName(name: string): string {
+    return name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
   private presetPath(name: string): string {
-    const safeName = name.replace(/[^a-zA-Z0-9_-]/g, "_");
-    return path.join(this.presetsDir, `${safeName}.json`);
+    return path.join(this.presetsDir, `${this.safeName(name)}.json`);
+  }
+
+  private builtInPresetPath(name: string): string {
+    return path.join(this.builtInPresetsDir, `${this.safeName(name)}.json`);
+  }
+
+  /** True if the preset name has no user copy and only exists as a built-in. */
+  isBuiltInPreset(name: string): boolean {
+    return !fs.existsSync(this.presetPath(name)) && fs.existsSync(this.builtInPresetPath(name));
   }
 
   listPresets(): PresetInfo[] {
-    const files = fs.readdirSync(this.presetsDir).filter((f) => f.endsWith(".json"));
-    return files.map((f) => {
-      const raw = JSON.parse(fs.readFileSync(path.join(this.presetsDir, f), "utf-8"));
-      return { name: raw.name, description: raw.description };
-    });
+    const seen = new Map<string, PresetInfo>();
+    const readDir = (dir: string, builtIn: boolean) => {
+      if (!fs.existsSync(dir)) return;
+      for (const f of fs.readdirSync(dir).filter((f) => f.endsWith(".json"))) {
+        try {
+          const raw = JSON.parse(fs.readFileSync(path.join(dir, f), "utf-8"));
+          if (!seen.has(raw.name)) {
+            seen.set(raw.name, { name: raw.name, description: raw.description, builtIn });
+          }
+        } catch {
+          // skip malformed preset files
+        }
+      }
+    };
+    // User presets take precedence over built-ins of the same name.
+    readDir(this.presetsDir, false);
+    readDir(this.builtInPresetsDir, true);
+    return [...seen.values()];
   }
 
   getPreset(name: string): Preset | undefined {
-    const p = this.presetPath(name);
-    if (!fs.existsSync(p)) {
-      return undefined;
+    const userPath = this.presetPath(name);
+    if (fs.existsSync(userPath)) {
+      return JSON.parse(fs.readFileSync(userPath, "utf-8"));
     }
-    return JSON.parse(fs.readFileSync(p, "utf-8"));
+    const builtInPath = this.builtInPresetPath(name);
+    if (fs.existsSync(builtInPath)) {
+      return JSON.parse(fs.readFileSync(builtInPath, "utf-8"));
+    }
+    return undefined;
   }
 
   savePreset(name: string, description?: string): void {
@@ -329,6 +361,10 @@ export class ThemeEngine {
   }
 
   renamePreset(oldName: string, newName: string): boolean {
+    if (this.isBuiltInPreset(oldName)) {
+      // Built-ins ship with the extension and can't be renamed; clone instead.
+      return false;
+    }
     const preset = this.getPreset(oldName);
     if (!preset) {
       return false;

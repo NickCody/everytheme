@@ -54,7 +54,7 @@
 | Provider | Default Model | Env Variable |
 |----------|--------------|--------------|
 | Anthropic | Claude Sonnet 4 | `ANTHROPIC_API_KEY` |
-| OpenAI | GPT-5.4 | `OPENAI_API_KEY` |
+| OpenAI | GPT-5.5 | `OPENAI_API_KEY` |
 | Gemini | Gemini 2.0 Flash | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 
 All available models can be selected via **Everytheme: Select AI Provider**.
